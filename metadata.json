@@ -1,0 +1,8 @@
+{
+  "name": "اهزم الروبوت - MTN Syria",
+  "description": "Live Kiosk Quiz Game: Human vs SYR-AI at the tech conference booth.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
