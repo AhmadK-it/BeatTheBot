@@ -20,14 +20,18 @@ import {
   Volume2,
   VolumeX,
   Music,
-  UserCircle
+  UserCircle,
+  AlertCircle
 } from 'lucide-react';
+import { generateQuestions, FALLBACK_QUESTIONS } from './services/questionGenerator';
+import { speakWithFallback } from './services/ttsService';
+import { playSound, playBackgroundSound, stopBackgroundSound, stopAllBackgroundSounds } from './services/soundEffects';
 
 // --- CONFIGURATION ---
 const TOTAL_ROUNDS = 5;
-const QUESTION_TIMER = 4500; // 1.5x of 3s = 4.5s
-const DECISION_TIMER = 5000; // 5s for the buzzed decision
-const COUNTDOWN_TIME = 3;
+const QUESTION_TIMER = 5000; // 5 seconds for question phase (matches max bot buzzer delay)
+const DECISION_TIMER = 6000; // 6 seconds for decision phase
+const COUNTDOWN_TIME = 3; // 5 second countdown before each question
 
 interface Question {
   id: number;
@@ -37,189 +41,6 @@ interface Question {
   correct: number;
   hint: string;
 }
-
-const QUESTIONS: Question[] = [
-  {
-    id: 1,
-    category: "أساسيات الاتصالات",
-    question: "ماذا يرمز اختصار LTE في شبكات الجيل الرابع؟",
-    options: ["التطور طويل الأمد (Long Term Evolution)", "طاقة تقنية منخفضة", "مدخل نغمة خفيف", "رابط إلى إيثرنت"],
-    correct: 0,
-    hint: "يركز على تطوير الشبكة على المدى البعيد."
-  },
-  {
-    id: 2,
-    category: "منتجات MTN",
-    question: "أي تقنية من MTN تسمح بمشاركة رقم واحد عبر أجهزة متعددة؟",
-    options: ["الرقم الموحد", "Multi-SIM (شريحة متعددة)", "سوبر نت", "خدمة باقتي"],
-    correct: 1,
-    hint: "تذكر أن الرقم يعمل على أكثر من شريحة (SIM)."
-  },
-  {
-    id: 3,
-    category: "تاريخ التقنية في سوريا",
-    question: "متى بدأت خدمة الجيل الثالث (3G) تجارياً في سوريا؟",
-    options: ["2005", "2010", "2015", "2020"],
-    correct: 1,
-    hint: "بدأت قبل الأزمة السورية بقليل."
-  },
-  {
-    id: 4,
-    category: "تقنيات عامة",
-    question: "ما هو مسمى 'Latency' في عالم الشبكات؟",
-    options: ["سرعة التحميل", "سعة البيانات", "زمن الاستجابة (تأخير)", "قوة الإشارة"],
-    correct: 2,
-    hint: "يتعلق بالوقت الذي تستغرقه البيانات للوصول."
-  },
-  {
-    id: 5,
-    category: "شبكات الجيل الخامس",
-    question: "ما هي الميزة الأساسية التي تجعل الـ 5G أسرع بكثير من الـ 4G؟",
-    options: ["استخدام الأسلاك", "ترددات الموجات المليمترية (mmWave)", "البطارية الكبيرة", "الأقمار الصناعية فقط"],
-    correct: 1,
-    hint: "تقنية تعتمد على موجات ذات تردد عالٍ جداً وقصير."
-  },
-  {
-    id: 6,
-    category: "خدمات MTN",
-    question: "ما الهدف الأساسي من خدمة 'MTN Cash'؟",
-    options: ["تصوير الفيديو", "الخدمات المالية الرقمية", "الألعاب أونلاين", "تحميل الأغاني"],
-    correct: 1,
-    hint: "خدمة لتحويل الأموال ودفع الفواتير إلكترونياً."
-  },
-  {
-    id: 7,
-    category: "أساسيات التقنية",
-    question: "ما هو اختصار كلمة 'SIM'؟",
-    options: ["وحدة تعريف المشترك", "خريطة تكامل النظام", "وضع الإنترنت الآمن", "وحدة الوسائط البسيطة"],
-    correct: 0,
-    hint: "المشترك هو الشخص الذي يستخدم الشريحة."
-  },
-  {
-    id: 8,
-    category: "أمن المعلومات",
-    question: "ما هي ميزة التحقق بخطوتين (2FA)؟",
-    options: ["تسريع الإنترنت", "زيادة أمان الحساب", "تغيير خلفية شاشة", "إرسال ملفات ضخمة"],
-    correct: 1,
-    hint: "طبقة إضافية فوق كلمة المرور لحمايتك."
-  },
-  {
-    id: 9,
-    category: "إنترنت الأشياء",
-    question: "ماذا يعني مصطلح IoT؟",
-    options: ["إنترنت الأشياء", "مكتب التقنية الدولي", "خدمات التشغيل الفوري", "تكامل المسارات"],
-    correct: 0,
-    hint: "توصيل الأجهزة المنزلية والآلات بالشبكة."
-  },
-  {
-    id: 10,
-    category: "تقنيات MTN",
-    question: "أي من هذه الحزم مخصصة للاستخدام الليلي في MTN؟",
-    options: ["باقة الفجر", "باقة الصباح", "باقة النجوم", "باقة السهر"],
-    correct: 3,
-    hint: "الجلوس مستيقظاً ليلاً يسمى 'سهر'."
-  }
-];
-
-// --- AUDIO SYNTHESIS ---
-type SoundType = 'tick' | 'buzz' | 'correct' | 'wrong' | 'lock' | 'bot_thinking' | 'bot_buzz' | 'bot_correct' | 'bot_wrong';
-
-const playSound = (type: SoundType, muted: boolean = false) => {
-  if (muted) return;
-  const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext;
-  if (!AudioContextClass) return;
-  
-  const ctx = new AudioContextClass();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  
-  const now = ctx.currentTime;
-  
-  switch(type) {
-    case 'tick':
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now);
-      gain.gain.setValueAtTime(0.05, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-      osc.start(now);
-      osc.stop(now + 0.1);
-      break;
-    case 'buzz':
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(120, now);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      osc.start(now);
-      osc.stop(now + 0.5);
-      break;
-    case 'lock':
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(440, now);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-      osc.start(now);
-      osc.stop(now + 0.2);
-      break;
-    case 'correct':
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); // C6
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc.start(now);
-      osc.stop(now + 0.4);
-      break;
-    case 'wrong':
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(100, now);
-      osc.frequency.linearRampToValueAtTime(50, now + 0.5);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-      osc.start(now);
-      osc.stop(now + 0.6);
-      break;
-    case 'bot_thinking':
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(50, now);
-      osc.frequency.linearRampToValueAtTime(60, now + 0.1);
-      gain.gain.setValueAtTime(0.015, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-      osc.start(now);
-      osc.stop(now + 0.1);
-      break;
-    case 'bot_buzz':
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(200, now);
-      osc.frequency.exponentialRampToValueAtTime(250, now + 0.2);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc.start(now);
-      osc.stop(now + 0.4);
-      break;
-    case 'bot_correct':
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.setValueAtTime(800, now + 0.1);
-      osc.frequency.setValueAtTime(1000, now + 0.2);
-      gain.gain.setValueAtTime(0.1, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      osc.start(now);
-      osc.stop(now + 0.4);
-      break;
-    case 'bot_wrong':
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(80, now);
-      osc.frequency.linearRampToValueAtTime(30, now + 1.0);
-      gain.gain.setValueAtTime(0.1, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-      osc.start(now);
-      osc.stop(now + 1.0);
-      break;
-  }
-};
 
 type GameState = 'INTRO' | 'COUNTDOWN' | 'WAITING_BUZZ' | 'DECISION' | 'ROUND_RESULT' | 'FINAL_RESULT';
 
@@ -254,48 +75,22 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [mutedSounds, setMutedSounds] = useState(false);
   const [mutedVoice, setMutedVoice] = useState(false);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   const speak = (text: string, onEnd?: () => void) => {
     if (mutedVoice) {
       if (onEnd) onEnd();
       return;
     }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      
-      const setVoice = () => {
-        const voices = window.speechSynthesis.getVoices();
-        // Prefer a female Arabic voice if possible for many kiosk apps, or just any high quality AR voice
-        const arVoice = voices.find(v => v.lang.startsWith('ar') && (v.name.includes('Female') || v.name.includes('Layla') || v.name.includes('Muna'))) 
-                      || voices.find(v => v.lang.startsWith('ar')) 
-                      || voices[0];
-        if (arVoice) utterance.voice = arVoice;
-      };
-
-      setVoice();
-      if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = setVoice;
-      }
-
-      utterance.lang = 'ar-SA';
-      utterance.rate = 0.9; // Slower for clarity
-      utterance.pitch = 1.0; 
-      
-      if (onEnd) {
-        utterance.onend = () => {
-          onEnd();
-        };
-      }
-      window.speechSynthesis.speak(utterance);
-    }
+    speakWithFallback(text, onEnd);
   };
 
   const readQuestionAndOptions = useCallback((q: Question) => {
     setIsReading(true);
     const text = `السؤال هو: ${q.question}. الخيارات هي: أ: ${q.options[0]}. ب: ${q.options[1]}. ج: ${q.options[2]}. د: ${q.options[3]}. اضغط الآن على الجرس للإجابة!`;
     speak(text, () => setIsReading(false));
-  }, []);
+  }, [mutedVoice]);
 
   const handleBuzzer = useCallback(() => {
     if (gameState !== 'WAITING_BUZZ' || buzzedBy !== null) return;
@@ -358,16 +153,38 @@ export default function App() {
     }
   }, [gameState, buzzedBy, playerAnswer, currentQuestion, evaluateRound, triggerBotReply, mutedSounds]);
 
-  const initGame = () => {
-    const shuffled = [...QUESTIONS].sort(() => 0.5 - Math.random()).slice(0, TOTAL_ROUNDS + 1); // Get 6 to allow for 1 skip
-    setQuestions(shuffled);
-    setRound(0);
-    setPlayerScore(0);
-    setBotScore(0);
-    setPlayerStreak(0);
-    setCrowdEnergy(50);
-    setSkipsAvailable(1);
-    startCountdown(0, shuffled);
+  const initGame = async () => {
+    setIsLoadingQuestions(true);
+    setQuestionsError(null);
+    
+    try {
+      // Try to generate questions from Gemini API
+      const generatedQuestions = await generateQuestions(TOTAL_ROUNDS + 1); // Get 6 to allow for 1 skip
+      const shuffled = generatedQuestions.sort(() => 0.5 - Math.random());
+      setQuestions(shuffled);
+      setRound(0);
+      setPlayerScore(0);
+      setBotScore(0);
+      setPlayerStreak(0);
+      setCrowdEnergy(50);
+      setSkipsAvailable(1);
+      setIsLoadingQuestions(false);
+      startCountdown(0, shuffled);
+    } catch (error) {
+      console.error('Failed to generate questions:', error);
+      // Fall back to hardcoded questions
+      setQuestionsError('استخدام الأسئلة المعدة مسبقاً');
+      const shuffled = [...FALLBACK_QUESTIONS].sort(() => 0.5 - Math.random()).slice(0, TOTAL_ROUNDS + 1);
+      setQuestions(shuffled);
+      setRound(0);
+      setPlayerScore(0);
+      setBotScore(0);
+      setPlayerStreak(0);
+      setCrowdEnergy(50);
+      setSkipsAvailable(1);
+      setIsLoadingQuestions(false);
+      startCountdown(0, shuffled);
+    }
   };
 
   const startCountdown = (roundIdx: number, qList: Question[]) => {
@@ -409,14 +226,14 @@ export default function App() {
       }, 800);
 
       const scoreDiff = botScore - playerScore;
-      let minDelay = 2500; 
-      let maxDelay = 4500;
+      let minDelay = 3000;  // Adjusted for 5s question timer
+      let maxDelay = 5000;  // Match QUESTION_TIMER
 
-      if (playerScore > botScore) { minDelay = 1500; maxDelay = 3000; } 
+      if (playerScore > botScore) { minDelay = 2000; maxDelay = 4000; } 
       else if (scoreDiff >= 1) { minDelay = 3500; maxDelay = 5000; }
 
       if (round === TOTAL_ROUNDS && Math.abs(scoreDiff) <= 1) {
-         minDelay = 2000; maxDelay = 3000;
+         minDelay = 2500; maxDelay = 4500;
       }
       
       const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1) + minDelay);
@@ -461,9 +278,13 @@ export default function App() {
   useEffect(() => {
     let timer: any;
     if (gameState === 'WAITING_BUZZ') {
+      // Initialize timer start when entering WAITING_BUZZ
+      timerStartRef.current = Date.now();
+      
       timer = setInterval(() => {
         if (isReading) {
           timerStartRef.current = Date.now(); // Keep pushing the start time forward while reading
+          setTimeLeft(QUESTION_TIMER); // Show full time while reading
           return;
         }
         const elapsed = Date.now() - timerStartRef.current;
@@ -519,6 +340,44 @@ export default function App() {
     }, 1000);
   }, [skipsAvailable, gameState, questions, round, speak, mutedSounds]);
 
+  // Background sound effects management
+  useEffect(() => {
+    if (gameState === 'WAITING_BUZZ' && buzzedBy === null) {
+      // Start atmospheric background for question phase
+      playBackgroundSound('question_bg', 'bg_question', mutedSounds);
+      return () => {
+        stopBackgroundSound('question_bg');
+      };
+    }
+  }, [gameState, buzzedBy, mutedSounds]);
+
+  // Decision/Options phase background sound
+  useEffect(() => {
+    if (gameState === 'DECISION') {
+      stopBackgroundSound('question_bg');
+      // Start pulsing background for decision phase
+      playBackgroundSound('decision_bg', 'bg_decision', mutedSounds);
+      return () => {
+        stopBackgroundSound('decision_bg');
+      };
+    }
+  }, [gameState, mutedSounds]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAllBackgroundSounds();
+    };
+  }, []);
+
+  // Helper to get progress bar color based on time percentage
+  const getProgressBarColor = (timeLeft: number, maxTime: number) => {
+    const percentage = (timeLeft / maxTime) * 100;
+    if (percentage > 60) return 'from-green-400 to-green-500';
+    if (percentage > 20) return 'from-yellow-400 to-yellow-500';
+    return 'from-red-500 to-red-600';
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen overflow-y-auto select-none bg-mtn-navy" dir="rtl">
       
@@ -566,7 +425,25 @@ export default function App() {
               </motion.div>
               <h1 className="text-4xl md:text-7xl font-black mb-4 text-white">اهزم الروبوت</h1>
               <p className="text-xl md:text-2xl mt-4 text-white/60 mb-12">مؤتمر سوريا للتقنية - MTN</p>
-              <button onClick={initGame} className="bg-mtn-yellow text-mtn-navy text-3xl md:text-5xl font-black px-12 md:px-24 py-6 rounded-full shadow-[0_15px_40px_rgba(255,204,0,0.3)] hover:scale-105 active:scale-95 transition-all">ابدأ الان!</button>
+              
+              {questionsError && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-yellow-500/20 border-2 border-yellow-500 rounded-2xl p-4 mb-6 max-w-md flex items-center gap-3 text-yellow-300"
+                >
+                  <AlertCircle size={24} className="flex-shrink-0" />
+                  <span className="text-sm md:text-base font-bold">{questionsError}</span>
+                </motion.div>
+              )}
+              
+              <button 
+                onClick={initGame} 
+                disabled={isLoadingQuestions}
+                className="bg-mtn-yellow text-mtn-navy text-3xl md:text-5xl font-black px-12 md:px-24 py-6 rounded-full shadow-[0_15px_40px_rgba(255,204,0,0.3)] hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {isLoadingQuestions ? 'جاري التحضير...' : 'ابدأ الان!'}
+              </button>
             </motion.div>
           )}
 
@@ -618,6 +495,23 @@ export default function App() {
                       <div className="absolute top-0 right-0 w-32 h-32 bg-mtn-yellow/5 -rotate-45 translate-x-12 -translate-y-12" />
                       <h2 className="text-xl md:text-4xl font-black text-white relative z-10 leading-tight">{currentQuestion?.question}</h2>
                    </div>
+                   
+                   {/* PROGRESS BAR BELOW QUESTION - Shows for WAITING_BUZZ and DECISION states */}
+                   {(gameState === 'WAITING_BUZZ' || gameState === 'DECISION') && (
+                     <div className="mt-6">
+                       <div className="w-full bg-white/5 h-4 rounded-full overflow-hidden border-2 border-white/10 shadow-lg">
+                         <motion.div 
+                           animate={{ 
+                             width: `${gameState === 'WAITING_BUZZ' ? (timeLeft / QUESTION_TIMER) * 100 : (decisionTimeLeft / DECISION_TIMER) * 100}%`
+                           }}
+                           className={`h-full bg-gradient-to-r ${gameState === 'WAITING_BUZZ' ? getProgressBarColor(timeLeft, QUESTION_TIMER) : getProgressBarColor(decisionTimeLeft, DECISION_TIMER)} shadow-[0_0_20px_rgba(255,255,255,0.4)]`}
+                         />
+                       </div>
+                       <div className="text-center mt-2 text-sm font-black text-white/70">
+                         {gameState === 'WAITING_BUZZ' ? `${(timeLeft / 1000).toFixed(1)}s` : `${(decisionTimeLeft / 1000).toFixed(1)}s`}
+                       </div>
+                     </div>
+                   )}
                 </div>
 
                 {gameState === 'WAITING_BUZZ' && (
@@ -641,12 +535,9 @@ export default function App() {
                           <span className="font-black text-lg">تخطي هذا السؤال</span>
                         </motion.button>
                       )}
+                    </div>
+                   )}
 
-                      <div className="w-full max-w-sm bg-white/5 h-3 rounded-full overflow-hidden border border-white/10">
-                         <motion.div animate={{ width: `${(timeLeft / QUESTION_TIMER) * 100}%` }} className="h-full bg-mtn-yellow shadow-[0_0_15px_#FFCC00]" />
-                      </div>
-                   </div>
-                )}
 
                 {gameState === 'DECISION' && buzzedBy === 'PLAYER' && (
                   <div className="flex-1 flex flex-col">
