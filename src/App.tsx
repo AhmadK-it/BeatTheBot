@@ -756,7 +756,7 @@ export default function App() {
                 </div>
                 
                 <h3 className="text-4xl md:text-8xl font-black mb-4 md:mb-6 text-white font-arabic">
-                   {isPlayerCorrect ? 'صح!' : (buzzedBy === 'PLAYER' || timeLeft <= 0) ? 'فاتك الوقت!' : 'تعادل!'}
+                   {isPlayerCorrect ? 'صح!' : (buzzedBy === 'PLAYER' || timeLeft <= 0) ? 'فاتك الوقت!' : 'بوت الذكاء الصنعي'}
                 </h3>
                 
                 <div className="bg-white/5 p-6 md:p-12 rounded-2xl md:rounded-3xl mb-8 md:mb-12 border border-white/10">
