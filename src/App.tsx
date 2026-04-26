@@ -42,9 +42,11 @@ interface Question {
 }
 
 type GameState = 'INTRO' | 'COUNTDOWN' | 'WAITING_BUZZ' | 'DECISION' | 'ROUND_RESULT' | 'FINAL_RESULT';
+type QuestionTopic = 'random' | 'general' | 'syrian-culture' | 'tech';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('INTRO');
+  const [selectedTopic, setSelectedTopic] = useState<QuestionTopic>('random');
   const [round, setRound] = useState(0);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -136,7 +138,7 @@ export default function App() {
     
     try {
       // Try to generate questions from Gemini API
-      const generatedQuestions = await generateQuestions(TOTAL_ROUNDS + 1); // Get 6 to allow for 1 skip
+      const generatedQuestions = await generateQuestions(TOTAL_ROUNDS + 1, selectedTopic); // Get 6 to allow for 1 skip
       const shuffled = generatedQuestions.sort(() => 0.5 - Math.random());
       setQuestions(shuffled);
       setRound(0);
@@ -402,6 +404,39 @@ export default function App() {
                   <span className="text-sm md:text-base font-bold">{questionsError}</span>
                 </motion.div>
               )}
+
+              {/* TOPIC SELECTION */}
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-12 w-full max-w-2xl"
+              >
+                <h2 className="text-2xl md:text-3xl font-black text-mtn-yellow mb-6">اختر موضوع الأسئلة</h2>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { id: 'general' as QuestionTopic, label: 'معلومات عامة', icon: '📚' },
+                    { id: 'syrian-culture' as QuestionTopic, label: 'الثقافة السورية', icon: '🇸🇾' },
+                    { id: 'random' as QuestionTopic, label: 'عشوائي', icon: '🎲' },
+                    { id: 'tech' as QuestionTopic, label: 'تكنولوجيا', icon: '💻' },
+                  ].map((topic) => (
+                    <motion.button
+                      key={topic.id}
+                      onClick={() => setSelectedTopic(topic.id)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`p-4 md:p-6 rounded-2xl font-black text-sm md:text-lg transition-all border-2 ${
+                        selectedTopic === topic.id
+                          ? 'bg-mtn-yellow text-mtn-navy border-mtn-yellow shadow-[0_0_20px_rgba(255,204,0,0.5)]'
+                          : 'bg-white/5 text-white border-white/20 hover:border-mtn-yellow/50'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">{topic.icon}</div>
+                      {topic.label}
+                    </motion.button>
+                  ))}
+                </div>
+              </motion.div>
               
               <button 
                 onClick={initGame} 

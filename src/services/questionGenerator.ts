@@ -215,9 +215,45 @@ function extractJSON(raw: string): any[] {
   return JSON.parse(match[0]);
 }
 
+// ─── Topic Filter Helper ──────────────────────────────────────────────────────
+function getTopicFilter(topic: string): string {
+  const filters: { [key: string]: string } = {
+    random: `Topic rules — choose ONLY from these categories, with accurate and up-to-date facts:
+1. شبكات الجوّال (Mobile Networks) — 4G LTE, 5G NR, VoLTE, VoNR, carrier aggregation, spectrum bands, Open RAN
+2. الذكاء الاصطناعي والحوسبة (AI & Computing) — machine learning, edge computing, cloud infrastructure, LLMs, IoT
+3. اتصالات عامة (General Telecom) — SIM/eSIM, roaming, QoS, network slicing, satellite internet (Starlink, OneWeb)
+4. الجغرافيا السورية (Syrian Geography) — cities, landmarks, natural features, regions
+5. اللغة والثقافة (Language & Culture) — literature, languages, cultural facts
+6. الرياضيات والمنطق (Math & Logic) — mathematical concepts, puzzles, logic problems`,
+
+    general: `Topic rules — ONLY generate questions from these general knowledge categories about technology and modern life:
+1. العلوم والطبيعة (Science & Nature) — physics, chemistry, biology, astronomy
+2. التاريخ (History) — world history, technological milestones, important events
+3. الجغرافيا (Geography) — countries, capitals, landmarks, climate zones
+4. اللغة والثقافة (Language & Culture) — literature, languages, cultural facts
+5. الرياضيات والمنطق (Math & Logic) — mathematical concepts, puzzles, logic problems`,
+
+    'syrian-culture': `Topic rules — ONLY generate questions about Syrian culture, history, geography, and traditions:
+1. التاريخ السوري (Syrian History) — ancient civilizations, modern history, key figures
+2. الثقافة والفنون السورية (Syrian Culture & Arts) — traditional music, dance, crafts, literature
+3. الجغرافيا السورية (Syrian Geography) — cities, landmarks, natural features, regions
+4. التقاليد والعادات (Traditions & Customs) — celebrations, food, customs, values
+5. الشخصيات البارزة (Notable Figures) — leaders, artists, authors, scientists from Syria`,
+
+    tech: `Topic rules — ONLY generate questions about technology, computing, and innovation:
+1. شبكات الجوّال (Mobile Networks) — 4G LTE, 5G NR, VoLTE, VoNR, carrier aggregation, spectrum bands, Open RAN
+2. أمن المعلومات (Cybersecurity) — phishing, encryption, 2FA, VPN, malware, zero-day, GDPR/data privacy
+3. تقنيات الإنترنت (Internet Technologies) — Wi-Fi 6/6E/7, IPv6, fiber optics, DNS, HTTP/3, QUIC, CDN
+4. الذكاء الاصطناعي والحوسبة (AI & Computing) — machine learning, edge computing, cloud infrastructure, LLMs, IoT
+5. البرمجة والتطوير (Programming & Development) — languages, frameworks, databases, DevOps`,
+  };
+
+  return filters[topic] || filters['random'];
+}
+
 // ─── Agentic Loop ─────────────────────────────────────────────────────────────
 
-export async function generateQuestions(count: number = 5): Promise<Question[]> {
+export async function generateQuestions(count: number = 5, topic: string = 'random'): Promise<Question[]> {
   // Always hits the API on each call — no session cache.
   // The seen-questions registry ensures no repeats across restarts.
 
@@ -234,6 +270,9 @@ export async function generateQuestions(count: number = 5): Promise<Question[]> 
           .map((q, i) => `  ${i + 1}. ${q}`)
           .join('\n')}\n`
       : '';
+
+  // Build the topic filter for the prompt
+  const topicFilter = getTopicFilter(topic);
 
   // Conversation history
   const history: ConversationMessage[] = [];
@@ -257,12 +296,7 @@ Each question object must follow this exact shape:
   "hint": "<hint in Arabic>"
 }
 
-Topic rules — choose ONLY from these categories, with accurate and up-to-date facts:
-1. شبكات الجوّال (Mobile Networks) — 4G LTE, 5G NR, VoLTE, VoNR, carrier aggregation, spectrum bands, Open RAN
-2. أمن المعلومات (Cybersecurity) — phishing, encryption, 2FA, VPN, malware, zero-day, GDPR/data privacy
-3. تقنيات الإنترنت (Internet Technologies) — Wi-Fi 6/6E/7, IPv6, fiber optics, DNS, HTTP/3, QUIC, CDN
-4. الذكاء الاصطناعي والحوسبة (AI & Computing) — machine learning, edge computing, cloud infrastructure, LLMs, IoT
-5. اتصالات عامة (General Telecom) — SIM/eSIM, roaming, QoS, network slicing, satellite internet (Starlink, OneWeb)
+${topicFilter}
 
 STRICT content rules:
 - Do NOT generate questions about any specific telecom operator, brand, or company (e.g. no MTN, Syriatel, Vodafone, etc.)
@@ -364,9 +398,19 @@ Start your response directly with [ and end with ].`,
         hint: q.hint?.trim() || 'فكر جيداً في الإجابة',
       }));
 
+      // ── SANITY CHECK: Ensure all questions have exactly 4 non-empty options ──
+      const validResult = result.filter((q) => {
+        if (!Array.isArray(q.options) || q.options.length !== 4) return false;
+        return q.options.every((opt) => typeof opt === 'string' && opt.length > 0);
+      });
+
+      if (validResult.length < result.length) {
+        console.warn(`[Agent] Filtered out ${result.length - validResult.length} questions with incomplete options`);
+      }
+
       // Register these as seen so they won't repeat in future rounds
-      markAsSeen(result);
-      return result;
+      markAsSeen(validResult);
+      return validResult.length >= count ? validResult.slice(0, count) : result;
     }
 
     // ── GOAL NOT MET: store progress ─────────────────────────────────────
@@ -408,8 +452,17 @@ Start your response directly with [ and end with ].`,
       correct: q.correct ?? 0,
       hint: q.hint?.trim() || 'فكر جيداً في الإجابة',
     }));
-    markAsSeen(partial);
-    return partial;
+
+    // ── SANITY CHECK: Filter out incomplete questions ──
+    const validPartial = partial.filter((q) => {
+      if (!Array.isArray(q.options) || q.options.length !== 4) return false;
+      return q.options.every((opt) => typeof opt === 'string' && opt.length > 0);
+    });
+
+    if (validPartial.length > 0) {
+      markAsSeen(validPartial);
+      return validPartial;
+    }
   }
 
   console.warn('[Agent] No valid questions produced. Using fallback questions.');
