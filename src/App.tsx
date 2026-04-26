@@ -24,14 +24,13 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { generateQuestions, FALLBACK_QUESTIONS } from './services/questionGenerator';
-import { speakWithFallback } from './services/ttsService';
 import { playSound, playBackgroundSound, stopBackgroundSound, stopAllBackgroundSounds } from './services/soundEffects';
 
 // --- CONFIGURATION ---
 const TOTAL_ROUNDS = 5;
 const QUESTION_TIMER = 5000; // 5 seconds for question phase (matches max bot buzzer delay)
 const DECISION_TIMER = 6000; // 6 seconds for decision phase
-const COUNTDOWN_TIME = 3; // 5 second countdown before each question
+const COUNTDOWN_TIME = 3; // 3 second countdown before each question
 
 interface Question {
   id: number;
@@ -69,51 +68,30 @@ export default function App() {
   const [crowdEnergy, setCrowdEnergy] = useState(50);
   const [hintVisible, setHintVisible] = useState(false);
 
-  const [isReading, setIsReading] = useState(false);
   const [skipsAvailable, setSkipsAvailable] = useState(1);
   const [isSkipping, setIsSkipping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [mutedSounds, setMutedSounds] = useState(false);
-  const [mutedVoice, setMutedVoice] = useState(false);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
 
-  const speak = (text: string, onEnd?: () => void) => {
-    if (mutedVoice) {
-      if (onEnd) onEnd();
-      return;
-    }
-    speakWithFallback(text, onEnd);
-  };
-
-  const readQuestionAndOptions = useCallback((q: Question) => {
-    setIsReading(true);
-    const text = `السؤال هو: ${q.question}. الخيارات هي: أ: ${q.options[0]}. ب: ${q.options[1]}. ج: ${q.options[2]}. د: ${q.options[3]}. اضغط الآن على الجرس للإجابة!`;
-    speak(text, () => setIsReading(false));
-  }, [mutedVoice]);
-
   const handleBuzzer = useCallback(() => {
     if (gameState !== 'WAITING_BUZZ' || buzzedBy !== null) return;
-    window.speechSynthesis.cancel();
-    setIsReading(false);
     setHintVisible(false);
     playSound('lock', mutedSounds);
     setBuzzedBy('PLAYER');
     setGameState('DECISION');
     decisionTimerStartRef.current = Date.now();
     setBotStatus('Waiting...');
-    speak("خمس ثوان للاختيار!");
   }, [gameState, buzzedBy]);
 
   const useHint = useCallback(() => {
     if (gameState !== 'DECISION' || buzzedBy !== 'PLAYER' || hintVisible) return;
     if (crowdEnergy < 15) {
-      speak("لا تملك طاقة كافية للمساعدة!");
       return;
     }
     setCrowdEnergy(e => Math.max(0, e - 15));
     setHintVisible(true);
-    speak(`تلميح: ${currentQuestion?.hint}`);
     playSound('lock', mutedSounds);
   }, [gameState, buzzedBy, hintVisible, crowdEnergy, currentQuestion, mutedSounds]);
 
@@ -123,7 +101,6 @@ export default function App() {
 
   const triggerBotReply = useCallback(() => {
     setBotStatus('My Turn!');
-    speak("خطأ! دوري الآن.");
     setTimeout(() => {
       setBotStatus('Correct!');
       playSound('correct', mutedSounds);
@@ -212,14 +189,13 @@ export default function App() {
       } else {
         setGameState('WAITING_BUZZ');
         timerStartRef.current = Date.now();
-        if (currentQuestion) readQuestionAndOptions(currentQuestion);
       }
     }
     return () => clearTimeout(timer);
-  }, [gameState, countdown, currentQuestion, readQuestionAndOptions]);
+  }, [gameState, countdown, mutedSounds]);
 
   useEffect(() => {
-    if (gameState === 'WAITING_BUZZ' && buzzedBy === null && !isReading) {
+    if (gameState === 'WAITING_BUZZ' && buzzedBy === null) {
       // Periodic thinking sound
       const thinkingInterval = setInterval(() => {
         playSound('bot_thinking', mutedSounds);
@@ -264,8 +240,6 @@ export default function App() {
             }
             setTimeout(evaluateRound, 1500);
           }, 1500);
-
-          speak("أوووه! الروبوت ضغط الجرس أسرع.");
         }
       }, delay);
       return () => {
@@ -273,7 +247,7 @@ export default function App() {
         clearInterval(thinkingInterval);
       };
     }
-  }, [gameState, currentQuestion, buzzedBy, isReading, playerStreak, evaluateRound, botScore, playerScore, round, mutedSounds]);
+  }, [gameState, currentQuestion, buzzedBy, playerStreak, evaluateRound, botScore, playerScore, round, mutedSounds]);
 
   useEffect(() => {
     let timer: any;
@@ -282,11 +256,6 @@ export default function App() {
       timerStartRef.current = Date.now();
       
       timer = setInterval(() => {
-        if (isReading) {
-          timerStartRef.current = Date.now(); // Keep pushing the start time forward while reading
-          setTimeLeft(QUESTION_TIMER); // Show full time while reading
-          return;
-        }
         const elapsed = Date.now() - timerStartRef.current;
         const remaining = Math.max(0, QUESTION_TIMER - elapsed);
         setTimeLeft(remaining);
@@ -311,7 +280,7 @@ export default function App() {
       }, 50);
     }
     return () => clearInterval(timer);
-  }, [gameState, buzzedBy, playerAnswer, triggerBotReply]);
+}, [gameState, buzzedBy, playerAnswer, triggerBotReply, mutedSounds]);
 
   const nextRound = () => {
     if (round < TOTAL_ROUNDS) startCountdown(round, questions);
@@ -321,8 +290,6 @@ export default function App() {
   const skipQuestion = useCallback(() => {
     if (skipsAvailable <= 0 || (gameState !== 'WAITING_BUZZ' && gameState !== 'DECISION')) return;
     
-    window.speechSynthesis.cancel();
-    setIsReading(false);
     setSkipsAvailable(0);
     setIsSkipping(true);
     playSound('lock', mutedSounds);
@@ -331,14 +298,13 @@ export default function App() {
     updatedQuestions.splice(round - 1, 1);
     setQuestions(updatedQuestions);
     
-    speak("تم تخطي السؤال! إليك سؤال جديد.");
     playSound('lock', mutedSounds);
     
     setTimeout(() => {
       setIsSkipping(false);
       startCountdown(round - 1, updatedQuestions);
     }, 1000);
-  }, [skipsAvailable, gameState, questions, round, speak, mutedSounds]);
+  }, [skipsAvailable, gameState, questions, round, mutedSounds]);
 
   // Background sound effects management
   useEffect(() => {
@@ -791,24 +757,6 @@ export default function App() {
                       >
                          <motion.div 
                            animate={{ x: mutedSounds ? 4 : 36 }}
-                           className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg"
-                         />
-                      </button>
-                   </div>
-
-                   <div className="flex items-center justify-between bg-white/5 p-6 rounded-3xl border border-white/10">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-mtn-yellow/10 rounded-2xl">
-                           <UserCircle className="text-mtn-yellow" size={24} />
-                        </div>
-                        <span className="text-xl font-bold text-white">صوت المساعد</span>
-                      </div>
-                      <button 
-                        onClick={() => setMutedVoice(!mutedVoice)}
-                        className={`w-16 h-8 rounded-full transition-colors relative ${mutedVoice ? 'bg-white/20' : 'bg-green-500'}`}
-                      >
-                         <motion.div 
-                           animate={{ x: mutedVoice ? 4 : 36 }}
                            className="absolute top-1 w-6 h-6 bg-white rounded-full shadow-lg"
                          />
                       </button>
