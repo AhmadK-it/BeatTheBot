@@ -105,6 +105,20 @@ If you want to change the asset names or formats, update the mapping inside `src
 - Prompting: `questionGenerator` builds a constrained prompt to return JSON-like objects (question text, four options, correct index, hint, category). The service validates the response and falls back to local questions on failure.
 - Error handling: The generator retries a few times and then uses a local fallback (`FALLBACK_QUESTIONS`) if the API fails.
 
+**Agentic Workflow**
+
+- **Overview:**: The question generator implements an agent-like loop — Think → Act → Observe → Repeat — to produce validated quiz questions from the Gemini model while enforcing strict output shape and content rules.
+- **Think (Prompt Construction):**: The service builds a focused prompt that includes the game role, strict JSON-only output format, a topic filter (based on the selected topic), and an "avoid" block listing previously seen questions so the model does not repeat content.
+- **Act (Model Call):**: The generator calls the Gemini API with the constructed prompt and receives a raw text response. The code extracts the JSON array from the model output (stripping fences and extra text) before parsing.
+- **Observe (Validation):**: Parsed output is validated against a schema: exactly 4 non-empty `options`, a numeric `correct` index (0–3), non-empty `question`, `category`, and `hint`. Validation also checks for duplicate or identical options.
+- **Repeat (Feedback & Retries):**: If validation fails, the system composes corrective feedback and (within configured retry limits) re-invokes the model with the feedback to improve results. The loop tracks iterations and attempted fixes in a small in-memory agent memory.
+- **Deduplication & State:**: A session-scoped `seenQuestions` registry stores normalized question text across rounds so the agent can include an "avoid" list in future prompts to reduce repeats.
+- **Sanity Filters:**: After a successful model response, additional sanity checks filter any items missing the required 4 valid options; the generator will fall back to partial results only when appropriate.
+- **Fallback Strategy:**: If the API fails, returns malformed data, or retries are exhausted, the service returns a deterministic `FALLBACK_QUESTIONS` array so the UI always has playable content.
+- **Rate-limits & Quotas:**: The service detects `429` responses and distinguishes between transient rate limits (retry with backoff) and hard quota errors (abort and fallback). Errors and retry attempts are logged for debugging.
+- **Why this design:**: The agentic loop gives the model actionable feedback to fix formatting and content issues, improves consistency across calls, and minimizes bad outputs reaching the UI while still preferring live, topical questions when available.
+
+
 **Sound design and service behavior**
 - Background loops:
 	- `new_question` — used during the question display / waiting-for-buzz phase; intended to loop while the question is active (50s target scope).
