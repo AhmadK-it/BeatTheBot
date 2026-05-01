@@ -1,4 +1,4 @@
-# Beat The Bot — MTN
+# Beat The Bot 
 
 BeatTheBot is an interactive React + TypeScript quiz game that challenges players to answer trivia questions faster and more accurately than an AI bot opponent. Built for the MTN Syria Technology Conference, it features dynamic question generation via Google Gemini API, real-time scoring, and immersive audio effects.
 
