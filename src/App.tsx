@@ -17,14 +17,12 @@ import {
   Gift,
   Lightbulb,
   Settings,
-  Volume2,
-  VolumeX,
   Music,
-  UserCircle,
   AlertCircle
 } from 'lucide-react';
 import { generateQuestions, FALLBACK_QUESTIONS } from './services/questionGenerator';
 import { playSound, playBackgroundSound, stopBackgroundSound, stopAllBackgroundSounds } from './services/soundEffects';
+import SyriaFlag from './music/syria.svg';
 
 // --- CONFIGURATION ---
 const TOTAL_ROUNDS = 5;
@@ -352,34 +350,34 @@ export default function App() {
       {/* IMPROVED HEADER STATUS BAR */}
       <header className="h-[90px] md:h-[130px] bg-mtn-darker text-white flex flex-col p-2 md:p-4 shadow-2xl z-20 shrink-0 border-b-2 border-mtn-yellow/20 relative">
         <div className="flex justify-between items-center mb-1 md:mb-2 px-2 md:px-4">
-          <div className="flex flex-col items-start min-w-[60px] md:min-w-[100px]">
-             <span className="text-[10px] md:text-sm font-black text-mtn-yellow uppercase tracking-widest text-right w-full">انت</span>
-             <span className="text-xl md:text-3xl font-black">{playerScore}</span>
-          </div>
-          <div className="flex flex-col items-center flex-1">
-             <div className="flex items-center gap-2 md:gap-4 mb-1">
-                <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-white/10 rounded-full transition-colors order-first">
-                   <Settings size={20} className="text-mtn-yellow" />
-                </button>
-                <div className="text-sm md:text-xl font-black bg-mtn-yellow text-mtn-navy px-4 md:px-8 py-1 rounded-full shadow-lg">الجولة {round} من {TOTAL_ROUNDS}</div>
-             </div>
-             {/* CROWD ENERGY METER RE-INTEGRATED */}
-             <div className="w-24 md:w-48 h-2 md:h-3 bg-white/10 rounded-full overflow-hidden border border-white/5">
-                <motion.div animate={{ width: `${crowdEnergy}%` }} className="h-full bg-gradient-to-r from-red-500 via-mtn-yellow to-green-500 shadow-[0_0_10px_#FFCC00]" />
-             </div>
-          </div>
-          <div className="flex flex-col items-end min-w-[60px] md:min-w-[100px]">
-             <span className="text-[10px] md:text-sm font-black text-mtn-yellow uppercase tracking-widest text-left w-full">الروبوت</span>
-             <span className="text-xl md:text-3xl font-black">{botScore}</span>
-          </div>
+         <div className="flex flex-col items-start min-w-[60px] md:min-w-[100px]">
+           <span className="text-[10px] md:text-sm font-black text-mtn-yellow uppercase tracking-widest text-right w-full">انت</span>
+           <span className="text-xl md:text-3xl font-black">{playerScore}</span>
+         </div>
+         <div className="flex flex-col items-center flex-1">
+           <div className="flex items-center gap-2 md:gap-4 mb-1">
+             <button onClick={() => setShowSettings(true)} className="p-2 hover:bg-white/10 rounded-full transition-colors order-first">
+               <Settings size={20} className="text-mtn-yellow" />
+             </button>
+             <div className="text-sm md:text-xl font-black bg-mtn-yellow text-mtn-navy px-4 md:px-8 py-1 rounded-full shadow-lg">الجولة {round} من {TOTAL_ROUNDS}</div>
+           </div>
+           {/* CROWD ENERGY METER RE-INTEGRATED */}
+           <div className="w-24 md:w-48 h-2 md:h-3 bg-white/10 rounded-full overflow-hidden border border-white/5">
+             <motion.div animate={{ width: `${crowdEnergy}%` }} className="h-full bg-gradient-to-r from-red-500 via-mtn-yellow to-green-500 shadow-[0_0_10px_#FFCC00]" />
+           </div>
+         </div>
+         <div className="flex flex-col items-end min-w-[60px] md:min-w-[100px]">
+           <span className="text-[10px] md:text-sm font-black text-mtn-yellow uppercase tracking-widest text-left w-full">الروبوت</span>
+           <span className="text-xl md:text-3xl font-black">{botScore}</span>
+         </div>
         </div>
         <div className="flex-1 flex gap-2 w-full px-2 mt-1">
-           <div className="flex-1 h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${(playerScore / TOTAL_ROUNDS) * 100}%` }} className="h-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
-           </div>
-           <div className="flex-1 h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden flex justify-end">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${(botScore / TOTAL_ROUNDS) * 100}%` }} className="h-full bg-red-500 shadow-[0_0_15px_rgba(239,44,44,0.5)]" />
-           </div>
+          <div className="flex-1 h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden">
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(playerScore / TOTAL_ROUNDS) * 100}%` }} className="h-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.5)]" />
+          </div>
+          <div className="flex-1 h-2 rounded-full bg-white/5 border border-white/10 overflow-hidden flex justify-end">
+            <motion.div initial={{ width: 0 }} animate={{ width: `${(botScore / TOTAL_ROUNDS) * 100}%` }} className="h-full bg-red-500 shadow-[0_0_15px_rgba(239,44,44,0.5)]" />
+          </div>
         </div>
       </header>
 
@@ -416,7 +414,9 @@ export default function App() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
                     { id: 'general' as QuestionTopic, label: 'معلومات عامة', icon: '📚' },
-                    { id: 'syrian-culture' as QuestionTopic, label: 'الثقافة السورية', icon: '🇸🇾' },
+                    { id: 'syrian-culture' as QuestionTopic, label: 'الثقافة السورية', icon: (
+                      <img src={SyriaFlag} alt="سوريا" className="inline-block w-8 h-5 object-cover rounded-sm" />
+                    ) },
                     { id: 'random' as QuestionTopic, label: 'عشوائي', icon: '🎲' },
                     { id: 'tech' as QuestionTopic, label: 'تكنولوجيا', icon: '💻' },
                   ].map((topic) => (
@@ -710,7 +710,7 @@ export default function App() {
                    <h2 className="text-3xl md:text-5xl font-black">جائزتك هي:</h2>
                  </div>
                  <div className="text-4xl md:text-6xl font-black mb-6 animate-pulse">
-                   {playerScore > botScore ? 'حزمة إنترنت مجانية!' : 'قسيمة خصم مميزة!'}
+                   {playerScore > botScore ? 'باقة إنترنت 10 غيغابايت مجانية!' : 'باقة إنترنت 3 غيغابايت مجانية!'}
                  </div>
                  <div className="bg-mtn-navy text-mtn-yellow py-3 px-8 rounded-2xl inline-block text-xl md:text-2xl font-black">
                    تفضل باستلام جائزتك من المنصة الآن!

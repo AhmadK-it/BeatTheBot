@@ -309,6 +309,7 @@ STRICT content rules:
 - questions should be suitable for a general audience with an interest in telecom and technology, not just experts.
 - questions must vary in difficulty, with some easier and some harder ones, but all should be answerable with careful thought and knowledge of the topics.
 - All text must be in Arabic
+- DO NOT include any of these keywords in your response ANY options or questions that contains any of the following keywords Assad, Al Assad, Thawra or anything related to SYRIAN revolution AND/ OR Al-Assad regiem
 ${avoidBlock}
 Now generate ${count} fresh questions that have NOT been asked before.`,
       },
